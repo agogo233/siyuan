@@ -1,0 +1,130 @@
+name: Build Win x64
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+    tags:
+      - '*-alpha*'
+      - '*-beta*'
+      - '*-rc*'
+  workflow_dispatch:
+
+jobs:
+  build-win-x64:
+    runs-on: windows-latest
+    name: Build Windows x64
+
+    env:
+      WORKSPACE: ${{ github.workspace }}/go/src/github.com/${{ github.repository }}
+      KERNEL_PATH: ../app/kernel/SiYuan-Kernel.exe
+      BUILD_FLAGS_PREFIX: -s -w -X
+      BUILD_FLAGS_SUFFIX: Mode=prod
+      GOPATH: ${{ github.workspace }}\go
+      GO111MODULE: on
+      CGO_ENABLED: 1
+      GOOS: windows
+      GOARCH: amd64
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: ${{ env.WORKSPACE }}
+
+      - name: Resolve pnpm version
+        id: pnpm
+        shell: bash
+        run: |
+          PACKAGE_JSON="${{ env.WORKSPACE }}/app/package.json"
+          PM=$(jq -r '.packageManager // empty' "$PACKAGE_JSON")
+          if [ -z "$PM" ]; then
+            echo "Error: packageManager not found in app/package.json" >&2
+            exit 1
+          fi
+          echo "version=$PM" >> $GITHUB_OUTPUT
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ${{ env.WORKSPACE }}\kernel\go.mod
+          cache-dependency-path: ${{ env.WORKSPACE }}\kernel\go.sum
+
+      - run: go version
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          install: p7zip mingw-w64-x86_64-lua
+
+      - name: Set up goversioninfo
+        run: go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
+        working-directory: ${{ env.WORKSPACE }}\kernel
+        env:
+          GOPATH: ${{ env.GOPATH }}
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: 1
+
+      - name: Generate Windows icon resource
+        run: ${{ env.GOPATH }}\bin\goversioninfo -platform-specific=true -icon="resource\icon.ico" -manifest="resource\goversioninfo.exe.manifest"
+        working-directory: ${{ env.WORKSPACE }}\kernel
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install pnpm
+        run: npm install -g ${{ steps.pnpm.outputs.version }}
+        working-directory: ${{ env.WORKSPACE }}\app
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('app/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-
+
+      - name: Install Node Dependencies
+        run: pnpm install --no-frozen-lockfile
+        working-directory: ${{ env.WORKSPACE }}\app
+
+      - name: Install Electron Binary
+        run: pnpm run install:electron
+        working-directory: ${{ env.WORKSPACE }}\app
+
+      - name: Building UI
+        run: pnpm run build
+        working-directory: ${{ env.WORKSPACE }}\app
+
+      - name: Clean old builds
+        run: |
+          rmdir /S /Q "${{ env.WORKSPACE }}\app\build" 2>nul || true
+          rmdir /S /Q "${{ env.WORKSPACE }}\app\kernel" 2>nul || true
+        shell: cmd
+
+      - name: Building Kernel
+        run: go build -tags fts5 -o "${{ env.KERNEL_PATH }}" -ldflags "${{ env.BUILD_FLAGS_PREFIX }} github.com/${{ github.repository }}/kernel/util.${{ env.BUILD_FLAGS_SUFFIX }}" .
+        working-directory: ${{ env.WORKSPACE }}\kernel
+        env:
+          GOPATH: ${{ env.GOPATH }}
+
+      - name: Create hardlink siyuan.exe
+        run: mklink /H "${{ env.WORKSPACE }}\app\kernel\siyuan.exe" "${{ env.WORKSPACE }}\app\kernel\SiYuan-Kernel.exe"
+        shell: cmd
+
+      - name: Copy elevator
+        run: copy "${{ env.WORKSPACE }}\app\elevator\elevator-amd64.exe" "${{ env.WORKSPACE }}\app\kernel\elevator.exe"
+        shell: cmd
+
+      - name: Building Electron App
+        run: pnpm run dist
+        working-directory: ${{ env.WORKSPACE }}\app
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: siyuan-win-x64
+          path: ${{ env.WORKSPACE }}\app\build\*.exe
