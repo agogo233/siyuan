@@ -123,8 +123,18 @@ jobs:
         run: pnpm run dist
         working-directory: ${{ env.WORKSPACE }}\app
 
+      - name: Package Portable ZIP
+        shell: pwsh
+        run: |
+          $version = (Get-Content "${{ env.WORKSPACE }}\app\package.json" | ConvertFrom-Json).version
+          $source = "${{ env.WORKSPACE }}\app\build\win-unpacked"
+          $dest = "${{ env.WORKSPACE }}\app\build\siyuan-${version}-win-portable.zip"
+          Compress-Archive -Path $source -DestinationPath $dest
+
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v7
         with:
           name: siyuan-win-x64
-          path: ${{ env.WORKSPACE }}\app\build\*.exe
+          path: |
+            ${{ env.WORKSPACE }}\app\build\*.exe
+            ${{ env.WORKSPACE }}\app\build\*.zip
