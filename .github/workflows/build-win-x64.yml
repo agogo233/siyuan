@@ -131,10 +131,14 @@ jobs:
           $dest = "${{ env.WORKSPACE }}\app\build\siyuan-${version}-win-portable.zip"
           Compress-Archive -Path $source -DestinationPath $dest
 
-      - name: Upload Build Artifact
+      - name: Upload Installer Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: siyuan-win-x64
-          path: |
-            ${{ env.WORKSPACE }}\app\build\*.exe
-            ${{ env.WORKSPACE }}\app\build\*.zip
+          name: siyuan-win-x64-installer
+          path: ${{ env.WORKSPACE }}\app\build\siyuan-*-win.exe
+
+      - name: Upload Portable Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: siyuan-win-x64-portable
+          path: ${{ env.WORKSPACE }}\app\build\siyuan-*-win-portable.zip
