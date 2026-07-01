@@ -263,7 +263,7 @@ func refreshSubscriptionExpirationRemind() {
 
 func refreshUser() {
 	defer logging.Recover()
-
+	return
 	if nil != Conf.GetUser() {
 		time.Sleep(2 * time.Minute)
 		if nil != Conf.GetUser() {

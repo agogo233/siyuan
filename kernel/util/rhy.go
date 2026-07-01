@@ -40,6 +40,7 @@ var (
 )
 
 func RefreshRhyResultJob() {
+	return
 	_, err := GetRhyResult(context.TODO(), true)
 	if nil != err {
 		// 系统唤醒后可能还没有网络连接，这里等待后再重试
