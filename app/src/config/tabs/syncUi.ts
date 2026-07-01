@@ -117,7 +117,7 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
         },
     },
     2: {
-        isProviderConfigAllowed: isPaidUser,
+        isProviderConfigAllowed: () => true,
         configKey: "s3",
         api: "/api/sync/setSyncProviderS3",
         getConfig: () => window.siyuan.config.sync.s3,
@@ -148,7 +148,7 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
         ],
     },
     3: {
-        isProviderConfigAllowed: isPaidUser,
+        isProviderConfigAllowed: () => true,
         configKey: "webdav",
         api: "/api/sync/setSyncProviderWebDAV",
         getConfig: () => window.siyuan.config.sync.webdav,
@@ -173,7 +173,7 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
         ],
     },
     4: {
-        isProviderConfigAllowed: isPaidUser,
+        isProviderConfigAllowed: () => true,
         configKey: "local",
         api: "/api/sync/setSyncProviderLocal",
         getConfig: () => window.siyuan.config.sync.local,

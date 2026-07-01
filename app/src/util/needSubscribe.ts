@@ -19,6 +19,4 @@ export const needSubscribe = (tip = window.siyuan.languages._kernel[29]) => {
 /**
  * 判断是否可以使用第三方同步
  */
-export const isPaidUser = () => {
-    return window.siyuan.user && (0 === window.siyuan.user.userSiYuanSubscriptionStatus || 1 === window.siyuan.user.userSiYuanOneTimePayStatus);
-};
+export const isPaidUser = () => true;

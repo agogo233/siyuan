@@ -266,11 +266,7 @@ func checkSync(boot, exit, byHand bool) bool {
 			return false
 		}
 	case conf.ProviderWebDAV, conf.ProviderS3, conf.ProviderLocal:
-		if !IsPaidUser() {
-			Conf.Sync.Enabled = false
-			Conf.Save()
-			return false
-		}
+		// 第三方同步对所有用户开放
 	}
 
 	if 7 < autoSyncErrCount && !byHand {

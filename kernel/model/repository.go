@@ -1144,10 +1144,7 @@ func DownloadCloudSnapshot(tag, id string) (err error) {
 			return
 		}
 	case conf.ProviderWebDAV, conf.ProviderS3, conf.ProviderLocal:
-		if !IsPaidUser() {
-			util.PushErrMsg(Conf.Language(214), 5000)
-			return
-		}
+		// 第三方同步对所有用户开放
 	}
 
 	defer util.PushClearProgress()
@@ -1186,10 +1183,7 @@ func UploadCloudSnapshot(tag, id string) (err error) {
 			return
 		}
 	case conf.ProviderWebDAV, conf.ProviderS3, conf.ProviderLocal:
-		if !IsPaidUser() {
-			util.PushErrMsg(Conf.Language(214), 5000)
-			return
-		}
+		// 第三方同步对所有用户开放
 	}
 
 	util.PushEndlessProgress(Conf.Language(116))
@@ -1227,10 +1221,7 @@ func RemoveCloudRepoTag(tag string) (err error) {
 			return
 		}
 	case conf.ProviderWebDAV, conf.ProviderS3, conf.ProviderLocal:
-		if !IsPaidUser() {
-			util.PushErrMsg(Conf.Language(214), 5000)
-			return
-		}
+		// 第三方同步对所有用户开放
 	}
 
 	err = repo.RemoveCloudRepoTag(tag)
@@ -1259,10 +1250,7 @@ func GetCloudRepoTagSnapshots() (ret []*dejavu.Log, err error) {
 			return
 		}
 	case conf.ProviderWebDAV, conf.ProviderS3, conf.ProviderLocal:
-		if !IsPaidUser() {
-			util.PushErrMsg(Conf.Language(214), 5000)
-			return
-		}
+		// 第三方同步对所有用户开放
 	}
 
 	logs, err := repo.GetCloudRepoTagLogs(map[string]any{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar})
@@ -1295,10 +1283,7 @@ func GetCloudRepoSnapshots(page int) (ret []*dejavu.Log, pageCount, totalCount i
 			return
 		}
 	case conf.ProviderWebDAV, conf.ProviderS3, conf.ProviderLocal:
-		if !IsPaidUser() {
-			util.PushErrMsg(Conf.Language(214), 5000)
-			return
-		}
+		// 第三方同步对所有用户开放
 	}
 
 	if 1 > page {
