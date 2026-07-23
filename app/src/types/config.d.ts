@@ -59,10 +59,13 @@ declare namespace Config {
          * Log level
          */
         logLevel: TLogLevel;
-        /**
-         * Whether to open the user guide after startup
-         */
-        openHelp: boolean;
+        onboarding: {
+            state: "pending" | "notebook-created" | "completed";
+            newUser: boolean;
+            dismissed: boolean;
+            notebookID: string;
+            documentID: string;
+        };
         /**
          * Publish service
          * 发布服务
@@ -73,6 +76,11 @@ declare namespace Config {
          * 全局只读
          */
         readonly: boolean;
+        /**
+         * Encrypted notebook global settings
+         * 加密笔记本全局设置
+         */
+        notebookCrypto: INotebookCrypto;
         repo: IRepo;
         /**
          * Global secrets store, referenced via {{secrets.NAME}} placeholders.
@@ -127,8 +135,11 @@ declare namespace Config {
         providers: IProvider[];
         editing: IEditing;
         agent: IAgent;
+        vision: IVision;
+        imageGeneration: IImageGeneration;
         mcp: IMCP;
         embedding: IEmbedding;
+        rerank: IRerank;
     }
 
     /**
@@ -137,6 +148,7 @@ declare namespace Config {
     export interface IAgent {
         modelId: string;
         sessionTimeout: number;
+        streamIdleTimeout: number;
         confirmTimeout: number;
         maxRetries: number;
         temperature: number;
@@ -154,6 +166,22 @@ declare namespace Config {
         maxCompletionTokens: number;
     }
 
+    export interface IVision {
+        modelId: string;
+        requestTimeout: number;
+        maxImageBytes: number;
+        maxPixels: number;
+        maxEdge: number;
+    }
+
+    export interface IImageGeneration {
+        modelId: string;
+        requestTimeout: number;
+        size: string;
+        quality: string;
+        outputFormat: "png" | "jpeg" | "webp";
+    }
+
     /**
      * Embedding model configuration
      */
@@ -168,6 +196,19 @@ declare namespace Config {
     }
 
     /**
+     * Rerank model configuration (semantic search result re-ranking)
+     */
+    export interface IRerank {
+        id: string;
+        enabled: boolean;
+        endpoint: string;
+        apiKey: string;
+        name: string;
+        timeout: number;
+        candidateCount: number;
+    }
+
+    /**
      * AI provider configuration
      */
     export interface IProvider {
@@ -175,6 +216,7 @@ declare namespace Config {
         enabled: boolean;
         displayName?: string;
         baseURL: string;
+        protocol?: string;
         apiKey: string;
         requestTimeout: number;
         models: IModel[];
@@ -199,6 +241,7 @@ declare namespace Config {
     }
 
     export interface IMCPServer {
+        id: string;
         enabled: boolean;
         name: string;
         url: string;
@@ -207,6 +250,7 @@ declare namespace Config {
         args?: string[];
         headers?: Record<string, string>;
         timeout: number;
+        trustToolAnnotations: boolean;
     }
 
     /**
@@ -408,7 +452,7 @@ declare namespace Config {
         allowSVGScript: boolean;
 
         /**
-         * Whether to allow to execute javascript in the HTML block
+         * 是否允许在 HTML 内容中执行 JavaScript
          */
         allowHTMLBLockScript: boolean;
 
@@ -466,6 +510,12 @@ declare namespace Config {
          * Whether to display the network image mark
          */
         displayNetImgMark: boolean;
+        /**
+         * Default state of database attributes
+         * - `0`: Expanded
+         * - `1`: Collapsed
+         */
+        databaseAttrViewMode: number;
         /**
          * The number of blocks loaded each time they are dynamically loaded
          */
@@ -706,6 +756,18 @@ declare namespace Config {
          * Whether to automatically locate the currently open document in the document tree
          */
         alwaysSelectOpenedFile: boolean;
+        /**
+         * Whether clicking a document icon expands or collapses its child documents
+         */
+        docIconClickExpand: boolean;
+        /**
+         * Whether clicking a parent document title expands or collapses its child documents
+         */
+        parentDocClickExpand: boolean;
+        /**
+         * Whether to enable top-level notebook documents
+         */
+        boxDocEnabled: boolean;
         /**
          * Whether to close all tabs when starting
          */
@@ -1178,6 +1240,9 @@ declare namespace Config {
         recentClosed: IKey;
         move: IKey;
         selectOpen1: IKey;
+        switchLeftDock: IKey;
+        switchRightDock: IKey;
+        switchBottomDock: IKey;
         toggleDock: IKey;
         splitLR: IKey;
         splitMoveR: IKey;
@@ -1481,6 +1546,23 @@ declare namespace Config {
      * Global variables store. Referenced via {{vars.NAME}} placeholders by the
      * agent http_request tool and MCP server headers.
      */
+    /**
+     * Encrypted notebook global settings
+     * 加密笔记本全局设置
+     */
+    export interface INotebookCrypto {
+        /**
+         * Whether encrypted notebook feature is enabled
+         * 加密笔记本功能是否已启用
+         */
+        enabled: boolean;
+        /**
+         * Auto-lock after idle minutes, 0 = disabled
+         * 自动锁定闲置分钟数，0 表示禁用
+         */
+        autoLockMinutes: number;
+    }
+
     export interface IVariables {
         items: IVariable[];
     }
@@ -2131,6 +2213,10 @@ declare namespace Config {
          * (Editor) Block ID
          */
         blockId: string;
+        /**
+         * 数据库行预览块 ID
+         */
+        databaseRowId?: string;
         /**
          * Object name
          */

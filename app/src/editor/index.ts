@@ -20,6 +20,7 @@ export class Editor extends Model {
         tab: Tab,
         blockId: string,
         rootId: string,
+        notebookId?: string,
         mode?: TEditorMode,
         action?: TProtyleAction[],
         afterInitProtyle?: (editor: Protyle) => void,
@@ -42,14 +43,17 @@ export class Editor extends Model {
         blockId: string,
         action?: TProtyleAction[]
         rootId: string,
+        notebookId?: string,
         mode?: TEditorMode,
         scrollPosition?: ScrollLogicalPosition,
         afterInitProtyle?: (editor: Protyle) => void,
     }) {
         this.editor = new Protyle(this.app, this.element, {
+            databaseAttr: true,
             action: options.action || [],
             blockId: options.blockId,
             rootId: options.rootId,
+            notebookId: options.notebookId,
             mode: options.mode,
             render: {
                 title: true,

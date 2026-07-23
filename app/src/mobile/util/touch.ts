@@ -12,6 +12,7 @@ import {isChromeBrowser, isInAndroid, isInHarmony, isIPhone} from "../../protyle
 import {getRangeByPoint} from "../../protyle/util/selection";
 import {getCurrentEditor} from "../editor";
 import {Constants} from "../../constants";
+import {getEmbedChildOperationContext} from "../../protyle/wysiwyg/getBlock";
 
 let clientX: number;
 let clientY: number;
@@ -56,7 +57,8 @@ export const handleTouchEnd = (event: TouchEvent) => {
     if (!isInHarmony() && !isInAndroid()) {
         handleTouchUp();
     }
-    if (Math.abs(clientX - event.changedTouches[0].clientX) < 5 && Math.abs(clientY - event.changedTouches[0].clientY) < 5) {
+    if (Math.abs(clientX - event.changedTouches[0].clientX) < Constants.SIZE_DRAG_THRESHOLD &&
+        Math.abs(clientY - event.changedTouches[0].clientY) < Constants.SIZE_DRAG_THRESHOLD) {
         if (editor && editor.protyle.toolbar.isMultiSelectMode()) {
             if (longPressTimer) {
                 event.stopImmediatePropagation();
@@ -99,14 +101,15 @@ export const handleTouchEnd = (event: TouchEvent) => {
     }
     if (typeof yDiff === "undefined" && editor?.protyle.options.render.gutter) {
         const nodeElement = hasClosestBlock(target);
-        if (nodeElement) {
+        if (nodeElement && nodeElement.closest(".protyle-wysiwyg")) {
             if (nodeElement.classList.contains("list") || nodeElement.classList.contains("li")) {
                 // 光标在列表下部应显示右侧的元素，而不是列表本身。放在 windowEvent 中的 mousemove 下处理
                 return;
             }
             const embedElement = isInEmbedBlock(nodeElement);
             if (embedElement) {
-                editor.protyle.gutter.render(editor.protyle, embedElement);
+                editor.protyle.gutter.render(editor.protyle,
+                    getEmbedChildOperationContext(nodeElement) ? nodeElement : embedElement, target);
                 return;
             }
             editor.protyle.gutter.render(editor.protyle, nodeElement, target);
@@ -264,8 +267,10 @@ export const handleTouchStart = (event: TouchEvent) => {
         if (blockElement && editor.protyle.wysiwyg.element.contains(blockElement)) {
             longPressTimer = window.setTimeout(() => {
                 window.getSelection()?.removeAllRanges();
-                activeBlur();
                 editor.protyle.toolbar.showMultiSelectMode(editor.protyle, blockElement);
+                if (editor.protyle.options.render.gutter) {
+                    editor.protyle.gutter.render(editor.protyle, blockElement, target);
+                }
             }, Constants.TIMEOUT_MULTIPLE_SELECT);
         }
     }

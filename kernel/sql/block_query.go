@@ -70,9 +70,12 @@ func queryBlockHashes(tx *sql.Tx, rootID string) (ret map[string]string) {
 	return
 }
 
-func QueryRootBlockByCondition(condition string, limit int) (ret []*Block) {
-	sqlStmt := "SELECT *, length(hpath) - length(replace(hpath, '/', '')) AS lv FROM blocks WHERE type = 'd' AND " + condition + " ORDER BY box DESC,lv ASC LIMIT " + strconv.Itoa(limit)
-	rows, err := query(sqlStmt)
+func QueryRootBlockByCondition(condition, exactKeyword string, limit int, args ...any) (ret []*Block) {
+	exactCondition, exactArg := rootBlockExactMatchCondition(exactKeyword, caseSensitive)
+	sqlStmt := "SELECT *, length(hpath) - length(replace(hpath, '/', '')) AS lv FROM blocks WHERE type = 'd' AND " + condition +
+		" ORDER BY CASE WHEN " + exactCondition + " THEN 0 ELSE 1 END ASC, box DESC, lv ASC LIMIT ?"
+	args = append(args, exactArg, limit)
+	rows, err := query(sqlStmt, args...)
 	if err != nil {
 		logging.LogErrorf("sql query [%s] failed: %s", sqlStmt, err)
 		return
@@ -88,6 +91,13 @@ func QueryRootBlockByCondition(condition string, limit int) (ret []*Block) {
 		ret = append(ret, &block)
 	}
 	return
+}
+
+func rootBlockExactMatchCondition(keyword string, sensitive bool) (condition, arg string) {
+	if sensitive {
+		return "content = ?", keyword
+	}
+	return "content LIKE ? ESCAPE '\\'", escapeLikePattern(keyword)
 }
 
 func (block *Block) IsContainerBlock() bool {
@@ -135,8 +145,8 @@ func QueryBlockAliases(rootID string) (ret []string) {
 	}
 
 	for _, aliasStr := range aliasesRows {
-		aliases := strings.Split(aliasStr, ",")
-		for _, alias := range aliases {
+		aliases := strings.SplitSeq(aliasStr, ",")
+		for alias := range aliases {
 			var exist bool
 			for _, retAlias := range ret {
 				if retAlias == alias {
@@ -177,8 +187,8 @@ func queryNames(searchIgnoreLines []string) (ret []string) {
 
 	set := hashset.New()
 	for _, namesStr := range namesRows {
-		names := strings.Split(namesStr, ",")
-		for _, name := range names {
+		names := strings.SplitSeq(namesStr, ",")
+		for name := range names {
 			if "" == strings.TrimSpace(name) {
 				continue
 			}
@@ -217,42 +227,14 @@ func queryAliases(searchIgnoreLines []string) (ret []string) {
 
 	set := hashset.New()
 	for _, aliasStr := range aliasesRows {
-		aliases := strings.Split(aliasStr, ",")
-		for _, alias := range aliases {
+		aliases := strings.SplitSeq(aliasStr, ",")
+		for alias := range aliases {
 			if "" == strings.TrimSpace(alias) {
 				continue
 			}
 			set.Add(alias)
 		}
 	}
-	for _, v := range set.Values() {
-		ret = append(ret, v.(string))
-	}
-	return
-}
-
-func queryDocIDsByTitle(title string, excludeIDs []string) (ret []string) {
-	ret = []string{}
-	notIn := "('" + strings.Join(excludeIDs, "','") + "')"
-
-	sqlStmt := "SELECT id FROM blocks WHERE type = 'd' AND content LIKE ? AND id NOT IN " + notIn + " LIMIT ?"
-	if caseSensitive {
-		sqlStmt = "SELECT id FROM blocks WHERE type = 'd' AND content = ? AND id NOT IN " + notIn + " LIMIT ?"
-	}
-	rows, err := query(sqlStmt, title, 32)
-	if err != nil {
-		logging.LogErrorf("sql query [%s] failed: %s", sqlStmt, err)
-		return
-	}
-	defer rows.Close()
-
-	set := hashset.New()
-	for rows.Next() {
-		var id string
-		rows.Scan(&id)
-		set.Add(id)
-	}
-
 	for _, v := range set.Values() {
 		ret = append(ret, v.(string))
 	}
@@ -284,8 +266,8 @@ func queryDocTitles(searchIgnoreLines []string) (ret []string) {
 
 	set := hashset.New()
 	for _, nameStr := range docNamesRows {
-		names := strings.Split(nameStr, ",")
-		for _, name := range names {
+		names := strings.SplitSeq(nameStr, ",")
+		for name := range names {
 			if "" == strings.TrimSpace(name) {
 				continue
 			}
@@ -622,10 +604,16 @@ func SelectBlocksRawStmtArgs(stmt string, args []any, limit int) (ret []*Block) 
 	return
 }
 
+type queryRowsFunc func(string, ...any) (*sql.Rows, error)
+
 func SelectBlocksRawStmt(stmt string, page, limit int) (ret []*Block) {
+	return selectBlocksRawStmtWithQuery(stmt, page, limit, query)
+}
+
+func selectBlocksRawStmtWithQuery(stmt string, page, limit int, queryFn queryRowsFunc) (ret []*Block) {
 	parsedStmt, err := sqlparser.Parse(stmt)
 	if err != nil {
-		return selectBlocksRawStmt(stmt, limit)
+		return selectBlocksRawStmtNoParseWithQuery(stmt, limit, queryFn)
 	}
 
 	switch parsedStmt.(type) {
@@ -701,7 +689,7 @@ func SelectBlocksRawStmt(stmt string, page, limit int) (ret []*Block) {
 	stmt = strings.ReplaceAll(stmt, "\\\"", "\"")
 	stmt = strings.ReplaceAll(stmt, "\\\\*", "\\*")
 	stmt = strings.ReplaceAll(stmt, "from dual", "")
-	rows, err := query(stmt)
+	rows, err := queryFn(stmt)
 	if err != nil {
 		if strings.Contains(err.Error(), "syntax error") {
 			return
@@ -823,7 +811,11 @@ func SelectBlocksRegexArgs(stmt string, exp *regexp.Regexp, name, alias, memo, i
 }
 
 func selectBlocksRawStmt(stmt string, limit int) (ret []*Block) {
-	rows, err := query(stmt)
+	return selectBlocksRawStmtNoParseWithQuery(stmt, limit, query)
+}
+
+func selectBlocksRawStmtNoParseWithQuery(stmt string, limit int, queryFn queryRowsFunc) (ret []*Block) {
+	rows, err := queryFn(stmt)
 	if err != nil {
 		if strings.Contains(err.Error(), "syntax error") {
 			return

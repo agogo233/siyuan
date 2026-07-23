@@ -1,6 +1,7 @@
 import {Constants} from "../../constants";
 import {closeModel, closePanel} from "./closePanel";
 import {getCurrentEditor, openMobileFileById} from "../editor";
+import {openMobileOnboarding} from "../../onboarding";
 import {validateName} from "../../editor/rename";
 import {getEventName} from "../../protyle/util/compatibility";
 import {fetchPost} from "../../util/fetch";
@@ -24,6 +25,7 @@ import {MobileCustom} from "../dock/MobileCustom";
 import {Menu} from "../../plugin/Menu";
 import {showMessage} from "../../dialog/message";
 import {setTitle} from "../../util/processTitle";
+import {activateQueuedAVLocate, queueAVLocateRequest} from "../../protyle/render/av/locate";
 
 let custom: MobileCustom;
 const openDockMenu = (app: App) => {
@@ -102,12 +104,7 @@ export const initFramework = (app: App, isStart: boolean) => {
                             isPreview: window.siyuan.mobile.editor ? !window.siyuan.mobile.editor.protyle.preview.element.classList.contains("fn__none") : false
                         });
                     } else {
-                        fetchPost("/api/outline/getDocOutline", {
-                            id: window.siyuan.mobile.editor.protyle.block.rootID,
-                            preview: window.siyuan.mobile.editor.protyle.preview.element.classList.contains("fn__none")
-                        }, response => {
-                            window.siyuan.mobile.docks.outline.update(response);
-                        });
+                        window.siyuan.mobile.docks.outline.reload();
                     }
                 } else if (type === "sidebar-backlink-tab") {
                     if (!window.siyuan.mobile.docks.backlink) {
@@ -154,12 +151,7 @@ export const initFramework = (app: App, isStart: boolean) => {
         sidebarElement.style.transform = "translateX(0px)";
         const type = sidebarElement.querySelector(".toolbar--border .toolbar__icon--active").getAttribute("data-type");
         if (type === "sidebar-outline-tab") {
-            fetchPost("/api/outline/getDocOutline", {
-                id: window.siyuan.mobile.editor.protyle.block.rootID,
-                preview: window.siyuan.mobile.editor.protyle.preview.element.classList.contains("fn__none")
-            }, response => {
-                window.siyuan.mobile.docks.outline.update(response);
-            });
+            window.siyuan.mobile.docks.outline.reload();
         } else if (type === "sidebar-backlink-tab") {
             window.siyuan.mobile.docks.backlink.update();
         } else if (type === "sidebar-bookmark-tab") {
@@ -185,8 +177,19 @@ export const initFramework = (app: App, isStart: boolean) => {
         }
         const info = parseUriInfo();
         if (info.id) {
-            openMobileFileById(app, info.id,
-                info.focus ? [Constants.CB_GET_ALL] : [Constants.CB_GET_HL, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL]);
+            if (info.avItemID) {
+                queueAVLocateRequest(info.id, {
+                    itemID: info.avItemID,
+                    viewID: info.avViewID,
+                    groupID: info.avGroupID,
+                });
+            }
+            openMobileFileById(app, info.id, info.avItemID ? [Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL] :
+                (info.focus ? [Constants.CB_GET_ALL] : [Constants.CB_GET_HL, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL]),
+            undefined, undefined, info.avItemID ? (protyle) => activateQueuedAVLocate(protyle, info.id) : undefined);
+            return;
+        }
+        if (openMobileOnboarding(app)) {
             return;
         }
         if (window.siyuan.config.fileTree.closeTabsOnStart && isStart) {
